@@ -121,17 +121,17 @@ func_apache_check(){
   fi
 }
 
-func_install_letsencrypt(){
-  echo '[Starting] cloning into letsencrypt!'
-  git clone https://github.com/certbot/certbot /opt/letsencrypt
-  echo '[Success] letsencrypt is built!'
-  cd /opt/letsencrypt
-  echo '[Starting] to build letsencrypt cert!'
-  ./letsencrypt-auto --apache -d $domain -n --register-unsafely-without-email --agree-tos 
+func_install_certbot(){
+  echo '[Starting] cloning into certbot!'
+  git clone https://github.com/certbot/certbot /opt/certbot
+  echo '[Success] certbot is built!'
+  cd /opt/certbot
+  echo '[Starting] to build certbot cert!'
+  ./certbot-auto --apache -d $domain -n --register-unsafely-without-email --agree-tos 
   if [ -e /etc/letsencrypt/live/$domain/fullchain.pem ]; then
-    echo '[Success] letsencrypt certs are built!'
+    echo '[Success] certbot certs are built!'
   else
-    echo "[ERROR] letsencrypt certs failed to build.  Check that DNS A record is properly configured for this domain"
+    echo "[ERROR] certbot certs failed to build.  Check that DNS A record is properly configured for this domain"
     exit 1
   fi
 }
@@ -168,7 +168,7 @@ case $1 in
   func_check_env
   func_check_tools
   func_apache_check
-  func_install_letsencrypt
+  func_install_certbot
   func_build_pkcs
   func_build_c2
   ;;
