@@ -11,9 +11,7 @@ tempdir=$(pwd)
 # Echo Title
 clear
 echo '=========================================================================='
-echo ' HTTPS C2 Done Right Setup Script | [Updated]: 2016'
-echo '=========================================================================='
-echo ' [Web]: Http://CyberSyndicates.com | [Twitter]: @KillSwitch-GUI'
+echo ' HTTPS C2 Done Right Setup Script | [Updated]: 2025'
 echo '=========================================================================='
 
 
