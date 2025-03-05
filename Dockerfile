@@ -1,60 +1,40 @@
-# BUILD INSTRUCTIONS & README
-# POST HERE: https://blog.obscuritylabs.com/docker-command-controll-c2/
-#   1) docker build --build-arg cskey="xxxx-xxxx-xxxx-xxxx" -t cobaltstrike/cs .
-#   2) docker run -d -p 192.168.2.238:50050:50050 cobaltstrike/cs 192.168.2.238 password
-#      - This runs docker in Detached mode, to tshoot issues or see logs do the following
-#   3) docker logs -f {docker ps -> CONTAINER ID}
-#      - Example: docker logs -f 38830d90537f
-#    NOTE: you can eaily name the docker like so as well:
-#      - docker run -d -p 192.168.2.238:50050:50050 --name "war_games"  cobaltstrike/cs 192.168.2.238 password
-#      - docker logs -f "war_games"
-#      - To kill CS: docker kill war_games
-#    NOTE: to go interactive we need to bypass the ENTRYPOINT
-#      - docker run -ti --entrypoint "" cobaltstrike/cs bash
-FROM ubuntu:16.04
+# Use a recent Ubuntu version
+FROM ubuntu:22.04
 
-# Dockerfile metadata
-MAINTAINER Killswitch-GUI
-LABEL version="1.0"
-LABEL description="Dockerfile base for CobaltStrike."
+# Metadata
+MAINTAINER poppopjmp
 
-# setup local env
-ARG cskey
-ENV cs_key ${cskey}
-ENV JAVA_HOME /opt/jdk-10.0.2
+# Build argument for the Cobalt Strike license key
+ARG CS_KEY
+
+# Install necessary packages, including OpenJDK 17
+RUN apt-get update && apt-get install -y wget curl net-tools openjdk-17-jdk-headless
+
+# Set JAVA_HOME and update PATH
+ENV JAVA_HOME /usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH $PATH:$JAVA_HOME/bin
 
-# docker hardcoded sh...
-SHELL ["/bin/bash", "-c"]
+# Create a non-root user for security
+RUN useradd -ms /bin/bash csuser
 
-# install proper tools
-RUN apt-get update && \
-    apt-get install -y wget curl net-tools sudo
+# Download and install Cobalt Strike (replace with the latest download method)
+# This section needs to be adapted based on the current Cobalt Strike download process.
+# This example assumes a direct download link, which may change.
+RUN wget -O cobaltstrike.tgz "YOUR_COBALT_STRIKE_DOWNLOAD_LINK" && \
+    tar xvf cobaltstrike.tgz && \
+    mv cobaltstrike /opt/ && \
+    echo "$CS_KEY" > /opt/cobaltstrike/.cobaltstrike.license && \
+    /opt/cobaltstrike/update
 
-# install oracle jave
-RUN cd /opt && \
-    wget -c --header 'Cookie: oraclelicense=accept-securebackup-cookie' http://download.oracle.com/otn-pub/java/jdk/10.0.2+13/19aef61b38124481863b1413dce1855f/jdk-10.0.2_linux-x64_bin.tar.gz && \
-    tar xvf jdk-10.0.2_linux-x64_bin.tar.gz && \
-    cd jdk-10.0.2 && \
-    source /etc/bash.bashrc && \
-    sudo update-alternatives --install '/usr/bin/java' 'java' '/opt/jdk-10.0.2/bin/java' 1 && \
-    sudo update-alternatives --install '/usr/bin/javac' 'javac' '/opt/jdk-10.0.2/bin/javac' 1 && \
-    sudo update-alternatives --set 'java' '/opt/jdk-10.0.2/bin/java' && \
-    sudo update-alternatives --set 'javac' '/opt/jdk-10.0.2/bin/javac'
+# Clean up package lists and temporary files
+RUN apt-get clean && apt-get autoremove && rm cobaltstrike.tgz
 
-# install CobaltStrike with license key and update
-RUN var=$(curl 'https://www.cobaltstrike.com/download' -XPOST -H 'Referer: https://www.cobaltstrike.com/download' -H 'Content-Type: application/x-www-form-urlencoded' -H 'Origin: https://www.cobaltstrike.com' -H 'Host: www.cobaltstrike.com' -H 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' -H 'Connection: keep-alive' -H 'Accept-Language: en-us' -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_13_1) AppleWebKit/604.3.5 (KHTML, like Gecko) Version/11.0.1 Safari/604.3.5' --data "dlkey=$cs_key" | sed -n 's/.*href="\([^"]*\).*/\1/p' | grep /downloads/ | cut -d '.' -f 1) && \
-    cd /opt && \
-    wget https://www.cobaltstrike.com$var.tgz && \
-    tar xvf cobaltstrike-trial.tgz && \
-    cd cobaltstrike && \
-    echo $cs_key > ~/.cobaltstrike.license && \
-    ./update
+# Set working directory and expose the default port
+WORKDIR /opt/cobaltstrike
+EXPOSE 50050
 
-# cleanup image
-RUN apt-get -y clean && \
-    apt-get -y autoremove
+# Switch to the non-root user
+USER csuser
 
-# set entry point
-WORKDIR "/opt/cobaltstrike"
+# Set the entry point to the Cobalt Strike team server
 ENTRYPOINT ["./teamserver"]
